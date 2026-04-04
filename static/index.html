@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BKPM - Backup Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#0f766e',
+                        primaryhover: '#0d9488',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <header class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-800">BKPM - Backup Manager</h1>
+            <p class="text-gray-600">Gestión automática de backups PostgreSQL</p>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold">Conexiones</h2>
+                    <button onclick="openModal()" class="bg-primary hover:bg-primaryhover text-white px-4 py-2 rounded">
+                        + Nueva Conexión
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead>
+                            <tr class="border-b">
+                                <th class="py-2">Nombre</th>
+                                <th class="py-2">Host</th>
+                                <th class="py-2">Schedule</th>
+                                <th class="py-2">Estado</th>
+                                <th class="py-2">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="connections-list">
+                            <tr><td colspan="5" class="text-center py-4 text-gray-500">Cargando...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold">Últimos Backups</h2>
+                    <button onclick="clearLogs()" class="text-red-600 hover:underline text-sm">Limpiar</button>
+                </div>
+                <div class="overflow-x-auto max-h-48 overflow-y-auto">
+                    <table class="w-full text-left">
+                        <thead>
+                            <tr class="border-b">
+                                <th class="py-2">Fecha</th>
+                                <th class="py-2">Conexión</th>
+                                <th class="py-2">Estado</th>
+                                <th class="py-2">Mensaje</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logs-list">
+                            <tr><td colspan="4" class="text-center py-4 text-gray-500">Cargando...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-6 bg-white rounded-lg shadow p-6">
+            <h2 class="text-xl font-semibold mb-4">Archivos de Backup</h2>
+            <div class="overflow-x-auto max-h-48 overflow-y-auto">
+                <table class="w-full text-left">
+                    <thead>
+                        <tr class="border-b">
+                            <th class="py-2">Nombre</th>
+                            <th class="py-2">Ruta</th>
+                            <th class="py-2">Tamaño</th>
+                            <th class="py-2">Fecha</th>
+                        </tr>
+                    </thead>
+                    <tbody id="backups-list">
+                        <tr><td colspan="4" class="text-center py-4 text-gray-500">Cargando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg mx-4">
+            <h3 id="modal-title" class="text-xl font-semibold mb-4">Nueva Conexión</h3>
+            <form id="connection-form" onsubmit="saveConnection(event)">
+                <input type="hidden" id="conn-id">
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Nombre</label>
+                        <input type="text" id="conn-name" required class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-primary">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Host</label>
+                        <input type="text" id="conn-host" required class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-primary">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Puerto</label>
+                        <input type="number" id="conn-port" value="5432" required class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-primary">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Usuario</label>
+                        <input type="text" id="conn-user" required class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-primary">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Password</label>
+                        <input type="password" id="conn-password" required class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-primary">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Base de Datos</label>
+                        <input type="text" id="conn-db_name" required class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-primary">
+                    </div>
+                    <div class="mb-4 col-span-2">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Schedule (cron)</label>
+                        <input type="text" id="conn-schedule" value="0 2 * * *" required class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-primary">
+                        <p class="text-xs text-gray-500 mt-1">Formato: minuto hora día mes día_semana</p>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2 mt-6">
+                    <button type="button" onclick="closeModal()" class="px-4 py-2 border rounded hover:bg-gray-100">Cancelar</button>
+                    <button type="submit" class="bg-primary hover:bg-primaryhover text-white px-4 py-2 rounded">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let connections = [];
+
+        async function loadData() {
+            await Promise.all([loadConnections(), loadLogs(), loadBackups()]);
+        }
+
+        async function loadConnections() {
+            try {
+                const res = await fetch('/api/connections');
+                connections = await res.json();
+                const tbody = document.getElementById('connections-list');
+                if (connections.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-gray-500">No hay conexiones</td></tr>';
+                } else {
+                    tbody.innerHTML = connections.map(c => `
+                        <tr class="border-b hover:bg-gray-50">
+                            <td class="py-2">${c.name}</td>
+                            <td class="py-2">${c.host}:${c.port}</td>
+                            <td class="py-2 text-sm font-mono">${c.schedule}</td>
+                            <td class="py-2">
+                                <span class="px-2 py-1 rounded text-xs ${c.enabled ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
+                                    ${c.enabled ? 'Activo' : 'Inactivo'}
+                                </span>
+                            </td>
+                            <td class="py-2">
+                                <button onclick="runBackup(${c.id})" class="text-green-600 hover:underline mr-2">Backup</button>
+                                <button onclick="editConnection(${c.id})" class="text-blue-600 hover:underline mr-2">Editar</button>
+                                <button onclick="toggleConnection(${c.id})" class="text-yellow-600 hover:underline mr-2">${c.enabled ? 'Desactivar' : 'Activar'}</button>
+                                <button onclick="deleteConnection(${c.id})" class="text-red-600 hover:underline">Eliminar</button>
+                            </td>
+                        </tr>
+                    `).join('');
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function loadLogs() {
+            try {
+                const res = await fetch('/api/logs');
+                let logs = await res.json();
+                logs = logs.slice(0, 5);
+                const tbody = document.getElementById('logs-list');
+                if (logs.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-gray-500">No hay logs</td></tr>';
+                } else {
+                    tbody.innerHTML = logs.map(l => `
+                        <tr class="border-b hover:bg-gray-50">
+                            <td class="py-2 text-sm">${l.created_at}</td>
+                            <td class="py-2">${l.connection_name}</td>
+                            <td class="py-2">
+                                <span class="px-2 py-1 rounded text-xs ${l.status === 'success' ? 'bg-green-100 text-green-800' : l.status === 'error' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}">
+                                    ${l.status}
+                                </span>
+                            </td>
+                            <td class="py-2 text-sm">${l.message}</td>
+                        </tr>
+                    `).join('');
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function loadBackups() {
+            try {
+                const res = await fetch('/api/backups');
+                const backups = await res.json();
+                const tbody = document.getElementById('backups-list');
+                if (backups.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-gray-500">No hay backups</td></tr>';
+                } else {
+                    tbody.innerHTML = backups.map(b => `
+                        <tr class="border-b hover:bg-gray-50">
+                            <td class="py-2">${b.name}</td>
+                            <td class="py-2 text-sm font-mono text-gray-500">${b.path}</td>
+                            <td class="py-2">${formatSize(b.size)}</td>
+                            <td class="py-2 text-sm">${b.created}</td>
+                        </tr>
+                    `).join('');
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        function formatSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function openModal(conn = null) {
+            document.getElementById('modal').classList.remove('hidden');
+            if (conn) {
+                document.getElementById('modal-title').textContent = 'Editar Conexión';
+                document.getElementById('conn-id').value = conn.id;
+                document.getElementById('conn-name').value = conn.name;
+                document.getElementById('conn-host').value = conn.host;
+                document.getElementById('conn-port').value = conn.port;
+                document.getElementById('conn-user').value = conn.user;
+                document.getElementById('conn-password').value = conn.password;
+                document.getElementById('conn-db_name').value = conn.db_name;
+                document.getElementById('conn-schedule').value = conn.schedule;
+            } else {
+                document.getElementById('modal-title').textContent = 'Nueva Conexión';
+                document.getElementById('connection-form').reset();
+                document.getElementById('conn-id').value = '';
+                document.getElementById('conn-port').value = '5432';
+                document.getElementById('conn-schedule').value = '0 2 * * *';
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('modal').classList.add('hidden');
+        }
+
+        async function saveConnection(e) {
+            e.preventDefault();
+            const id = document.getElementById('conn-id').value;
+            const conn = {
+                name: document.getElementById('conn-name').value,
+                host: document.getElementById('conn-host').value,
+                port: parseInt(document.getElementById('conn-port').value),
+                user: document.getElementById('conn-user').value,
+                password: document.getElementById('conn-password').value,
+                db_name: document.getElementById('conn-db_name').value,
+                schedule: document.getElementById('conn-schedule').value,
+                enabled: true
+            };
+
+            try {
+                if (id) {
+                    await fetch(`/api/connections/${id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(conn)
+                    });
+                } else {
+                    await fetch('/api/connections', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(conn)
+                    });
+                }
+                closeModal();
+                loadData();
+            } catch (e) {
+                alert('Error al guardar: ' + e.message);
+            }
+        }
+
+        function editConnection(id) {
+            const conn = connections.find(c => c.id === id);
+            if (conn) openModal(conn);
+        }
+
+        async function toggleConnection(id) {
+            try {
+                await fetch(`/api/connections/${id}/toggle`, { method: 'POST' });
+                loadData();
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
+        }
+
+        async function deleteConnection(id) {
+            if (!confirm('¿Estás seguro de eliminar esta conexión?')) return;
+            try {
+                await fetch(`/api/connections/${id}`, { method: 'DELETE' });
+                loadData();
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
+        }
+
+        async function runBackup(id) {
+            if (!confirm('¿Ejecutar backup ahora?')) return;
+            try {
+                const res = await fetch(`/api/connections/${id}/backup`, { method: 'POST' });
+                const result = await res.json();
+                if (result.success) {
+                    alert('Backup completado: ' + result.file_path);
+                } else {
+                    alert('Error: ' + result.message);
+                }
+                loadData();
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
+        }
+
+        async function clearLogs() {
+            if (!confirm('¿Limpiar todos los logs?')) return;
+            try {
+                await fetch('/api/logs', { method: 'DELETE' });
+                loadData();
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
+        }
+
+        loadData();
+        setInterval(loadData, 10000);
+    </script>
+</body>
+</html>

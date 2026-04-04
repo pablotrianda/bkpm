@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  bkpm:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bkpm
+    restart: unless-stopped
+    ports:
+      - "3450:3450"
+    environment:
+      - TZ=${TZ:-America/Argentina/Buenos_Aires}
+      - BACKUP_DIR=/backups
+      - DB_PATH=/data/bkpm.db
+      - PORT=3450
+      - HTML_PATH=/app/static/index.html
+    volumes:
+      - ./backups:/backups
+      - ./data:/data
+    networks:
+      - bkpm-network
+
+networks:
+  bkpm-network:
+    driver: bridge
