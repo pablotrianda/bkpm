@@ -230,38 +230,40 @@ async fn get_backups() -> Json<Vec<BackupFile>> {
     let backup_dir = std::env::var("BACKUP_DIR").unwrap_or_else(|_| "/backups".to_string());
     let mut backups = Vec::new();
 
-    if let Ok(entries) = std::fs::read_dir(&backup_dir) {
-        for entry in entries.flatten() {
-            if entry.file_type().map(|f| f.is_dir()).unwrap_or(false) {
-                if let Ok(sub_entries) = std::fs::read_dir(entry.path()) {
-                    for sub in sub_entries.flatten() {
-                        if let Ok(meta) = sub.metadata() {
-                            if meta.is_file() {
-                                let created = meta
-                                    .created()
-                                    .map(|t| {
-                                        chrono::DateTime::<chrono::Local>::from(t)
-                                            .format("%Y-%m-%d %H:%M:%S")
-                                            .to_string()
-                                    })
-                                    .unwrap_or_default();
+    scan_directory_recursive(&std::path::Path::new(&backup_dir), &mut backups);
 
-                                backups.push(BackupFile {
-                                    path: sub.path().to_string_lossy().to_string(),
-                                    name: sub.file_name().to_string_lossy().to_string(),
-                                    size: meta.len(),
-                                    created,
-                                });
-                            }
-                        }
+    backups.sort_by(|a, b| b.created.cmp(&a.created));
+    Json(backups)
+}
+
+fn scan_directory_recursive(path: &std::path::Path, backups: &mut Vec<BackupFile>) {
+    if let Ok(entries) = std::fs::read_dir(path) {
+        for entry in entries.flatten() {
+            if let Ok(file_type) = entry.file_type() {
+                if file_type.is_file() {
+                    if let Ok(meta) = entry.metadata() {
+                        let created = meta
+                            .created()
+                            .map(|t| {
+                                chrono::DateTime::<chrono::Local>::from(t)
+                                    .format("%Y-%m-%d %H:%M:%S")
+                                    .to_string()
+                            })
+                            .unwrap_or_default();
+
+                        backups.push(BackupFile {
+                            path: entry.path().to_string_lossy().to_string(),
+                            name: entry.file_name().to_string_lossy().to_string(),
+                            size: meta.len(),
+                            created,
+                        });
                     }
+                } else if file_type.is_dir() {
+                    scan_directory_recursive(&entry.path(), backups);
                 }
             }
         }
     }
-
-    backups.sort_by(|a, b| b.created.cmp(&a.created));
-    Json(backups)
 }
 
 async fn get_logs(State(state): State<AppState>) -> Json<Vec<Log>> {
