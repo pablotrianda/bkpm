@@ -280,18 +280,12 @@ fn scan_directory_recursive(path: &std::path::Path, backups: &mut Vec<BackupFile
             if let Ok(file_type) = entry.file_type() {
                 if file_type.is_file() {
                     if let Ok(meta) = entry.metadata() {
-                        let created = meta
-                            .created()
-                            .map(|t| {
-                                chrono::DateTime::<chrono::Local>::from(t)
-                                    .format("%Y-%m-%d %H:%M:%S")
-                                    .to_string()
-                            })
-                            .unwrap_or_default();
+                        let name = entry.file_name().to_string_lossy().to_string();
+                        let created = extract_date_from_filename(&name);
 
                         backups.push(BackupFile {
                             path: entry.path().to_string_lossy().to_string(),
-                            name: entry.file_name().to_string_lossy().to_string(),
+                            name,
                             size: meta.len(),
                             created,
                         });
