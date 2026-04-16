@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use super::events::Action;
 use crate::db::Db;
 use crate::models::Connection;
@@ -69,10 +71,11 @@ impl AppState {
         let db_path = std::env::var("DB_PATH").unwrap_or_else(|_| "bkpm.db".to_string());
         let db = Db::new(&db_path).expect("Failed to open database");
         let connections = db.get_all().unwrap_or_default();
+        let db = Arc::new(db);
 
         let backup_dir = std::env::var("BACKUP_DIR").unwrap_or_else(|_| "./backups".to_string());
         let mut scheduler = Scheduler::new();
-        scheduler.start(connections.clone(), backup_dir.clone());
+        scheduler.start(db.clone(), backup_dir.clone());
 
         Self {
             connections,
