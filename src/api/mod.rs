@@ -1,5 +1,5 @@
 use axum::{
-    extract::State,
+    extract::{Query, State},
     http::StatusCode,
     response::Json,
     routing::{get, post, put},
@@ -7,6 +7,7 @@ use axum::{
 };
 use chrono::{DateTime, Datelike, FixedOffset, Timelike};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::db::Db;
@@ -218,7 +219,7 @@ async fn run_backup_now(
     })
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 struct BackupFile {
     path: String,
     name: String,
@@ -226,14 +227,51 @@ struct BackupFile {
     created: String,
 }
 
-async fn get_backups() -> Json<Vec<BackupFile>> {
+#[derive(Serialize)]
+struct PaginatedBackups {
+    data: Vec<BackupFile>,
+    page: usize,
+    limit: usize,
+    total: usize,
+    total_pages: usize,
+}
+
+async fn get_backups(Query(params): Query<HashMap<String, String>>) -> Json<PaginatedBackups> {
     let backup_dir = std::env::var("BACKUP_DIR").unwrap_or_else(|_| "/backups".to_string());
     let mut backups = Vec::new();
 
     scan_directory_recursive(&std::path::Path::new(&backup_dir), &mut backups);
 
     backups.sort_by(|a, b| b.created.cmp(&a.created));
-    Json(backups)
+
+    let total = backups.len();
+    let limit: usize = params.get("limit")
+        .and_then(|v: &String| v.parse().ok())
+        .unwrap_or(10)
+        .max(1)
+        .min(100);
+    let page: usize = params.get("page")
+        .and_then(|v: &String| v.parse().ok())
+        .unwrap_or(1)
+        .max(1);
+    let total_pages = (total + limit - 1) / limit;
+    let actual_page = page.min(total_pages.max(1));
+
+    let start = (actual_page - 1) * limit;
+    let end = (start + limit).min(total);
+    let data = if start < total {
+        backups[start..end].to_vec()
+    } else {
+        Vec::new()
+    };
+
+    Json(PaginatedBackups {
+        data,
+        page: actual_page,
+        limit,
+        total,
+        total_pages,
+    })
 }
 
 fn scan_directory_recursive(path: &std::path::Path, backups: &mut Vec<BackupFile>) {

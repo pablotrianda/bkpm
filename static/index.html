@@ -75,7 +75,14 @@
         </div>
 
         <div class="mt-6 bg-white rounded-lg shadow p-6">
-            <h2 class="text-xl font-semibold mb-4">Archivos de Backup</h2>
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-semibold">Archivos de Backup</h2>
+                <div class="flex items-center gap-2">
+                    <button onclick="changePage(-1)" id="btn-prev" class="px-3 py-1 border rounded hover:bg-gray-100 disabled:opacity-50" disabled>Anterior</button>
+                    <span id="page-info" class="text-sm text-gray-600">- / -</span>
+                    <button onclick="changePage(1)" id="btn-next" class="px-3 py-1 border rounded hover:bg-gray-100 disabled:opacity-50" disabled>Siguiente</button>
+                </div>
+            </div>
             <div class="overflow-x-auto max-h-48 overflow-y-auto">
                 <table class="w-full text-left">
                     <thead>
@@ -181,7 +188,7 @@
             try {
                 const res = await fetch('/api/logs');
                 let logs = await res.json();
-                logs = logs.slice(0, 5);
+                logs = logs.slice(0, 10);
                 const tbody = document.getElementById('logs-list');
                 if (logs.length === 0) {
                     tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-gray-500">No hay logs</td></tr>';
@@ -204,10 +211,16 @@
             }
         }
 
+        let backupsPage = 1;
+        let backupsTotalPages = 1;
+
         async function loadBackups() {
             try {
-                const res = await fetch('/api/backups');
-                const backups = await res.json();
+                const res = await fetch(`/api/backups?page=${backupsPage}&limit=10`);
+                const result = await res.json();
+                backupsPage = result.page;
+                backupsTotalPages = result.total_pages || 1;
+                const backups = result.data;
                 const tbody = document.getElementById('backups-list');
                 if (backups.length === 0) {
                     tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-gray-500">No hay backups</td></tr>';
@@ -221,8 +234,19 @@
                         </tr>
                     `).join('');
                 }
+                document.getElementById('page-info').textContent = `${backupsPage} / ${backupsTotalPages}`;
+                document.getElementById('btn-prev').disabled = backupsPage <= 1;
+                document.getElementById('btn-next').disabled = backupsPage >= backupsTotalPages;
             } catch (e) {
                 console.error(e);
+            }
+        }
+
+        function changePage(delta) {
+            const newPage = backupsPage + delta;
+            if (newPage >= 1 && newPage <= backupsTotalPages) {
+                backupsPage = newPage;
+                loadBackups();
             }
         }
 
